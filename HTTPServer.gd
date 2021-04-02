@@ -8,8 +8,6 @@ extends Reference
 ##	Hyper-text transfer protocol server.
 ##	Used to serve files and other data, communicate, process requests from HTTP client (sometimes called "user agents") among other use cases.
 ##
-##@tutorial: tutorial.html
-##
 
 const COMPRESSION_NAME_MODE: Dictionary = {
 	"gzip": File.COMPRESSION_GZIP,
@@ -75,7 +73,7 @@ func get_data_priority_header(header) -> Array:
 	
 	return result
 
-#lire le contenue (datas, fichiers ect envoyer pas le client)
+# lire le contenu (données, fichiers ect envoyés par le client)
 class FieldStorage:
 	var form_data = {
 		"mime": {},
@@ -97,7 +95,7 @@ class FieldStorage:
 			#Si la fin du message multipart/form-data est valide
 			if environ["CONTENT"].ends_with("--" + boundary + "--"):
 				var form: PoolStringArray = environ["CONTENT"].split("--" + boundary, false)
-				#On supprime le premier élément du tableau car il est vide.
+				#Nous supprimons le premier élément du tableau car il est vide.
 				form.resize(form.size() - 1)
 				
 				var regex = RegEx.new()
@@ -138,7 +136,7 @@ var accept_compress := false
 
 var ssl := false
 
-# application helloworld par deffaut
+# application helloworld par défaut
 func _application(environ):
 	return ["200 OK", {"content-type": "text/plain"}, "Hello world".to_utf8()]
 
@@ -224,7 +222,7 @@ func poll():
 				
 				threads[thread] = []
 			
-			# on cherche un tread qui a le moins de client a gérer
+			# nous recherchons un thread qui a le moins de clients à gérer
 			var worker_libre = [null, 500]
 			for thread in threads.keys():
 				if threads[thread].size() < worker_libre[1]:
@@ -248,7 +246,7 @@ func poll():
 			else:
 				print("max_client_per_worker attin!")
 			
-	#on tue les thread qui non plus de clients a gèrer
+	#nous détruisons les threads qui n'ont plus de clients à gérer
 	for thread in threads.keys():
 		if threads[thread].empty():
 			threads.erase(thread)
@@ -371,7 +369,7 @@ class StreamPeerHTTP:
 					#on récup la requet du client
 					var response = peer.get_partial_data(peer.get_available_bytes())
 					
-					#si ya pas d'erreur
+					#si il y a pas d'erreur
 					if response[0] == OK:
 						http_response += response[1].get_string_from_utf8()
 					else:
@@ -435,7 +433,7 @@ class StreamPeerHTTP:
 							if environ:
 								data_vus = application.call_funcv([environ])
 								
-								#on pence a vérif les valeur retourner parle la fonction affecter la la variable aplication du server
+								#on pence a vérifier la valeur de retour par la fonction assigner la variable d'application serveur
 								if typeof(data_vus) != TYPE_ARRAY:
 									push_error("(HTTPServer) The function assigned to the \"application\" variable of the server must return an \"Array\" type object.")
 									data_vus = http_error(environ, 500)
@@ -533,10 +531,10 @@ class StreamPeerHTTP:
 						
 						header = null
 					else:
-						#on tronque la parti servi par le serveur pour garder que la parti non servi qui plustard devra être servi par le serveur
+						#on tronque la portion servie par le serveur pour garder que la portion inutilisée qui devra plus tard être servie par le serveur
 						header = header.subarray(error_and_cursor_responce[1], -1)
 						
-					#quand la totalité de la réponce a été servi
+					#lorsque toute la réponse a été servie
 					if !header:
 						data_vus = []
 						print("complet")
