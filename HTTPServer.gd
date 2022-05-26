@@ -1,6 +1,6 @@
-class_name HTTPServer
+extends Object
 
-extends RefCounted
+class_name HTTPServer
 
 ##Hyper-text transfer protocol server.
 ##
@@ -48,10 +48,11 @@ signal thread_released()
 
 var http_server = self
 
-static func sort_ascending(a, b) -> bool:
-	if a[1] < b[1]:
-		return true
-	return false
+class CustomSorter:
+	static func sort_ascending(a, b) -> bool:
+		if a[1] < b[1]:
+			return true
+		return false
 
 
 func get_data_priority_header(header) -> Array:
@@ -60,7 +61,7 @@ func get_data_priority_header(header) -> Array:
 	for gf in header.replace(" ", "").split(","):
 		var ggffd = gf.split(";q=")
 		
-		if not ggffd.is_empty() and ggffd.size() < 3:
+		if not ggffd.empty() and ggffd.size() < 3:
 			if ggffd.size() == 1:
 				ggffd.insert(1, "1")
 			elif not ggffd[1].is_valid_float():
@@ -72,7 +73,7 @@ func get_data_priority_header(header) -> Array:
 			
 		result.push_back(ggffd)
 	
-	result.sort_custom(Callable(self, "sort_ascending"))
+	result.sort_custom(CustomSorter, "sort_ascending")
 	
 	return result
 
@@ -98,7 +99,7 @@ class FieldStorage:
 			
 			#Si la fin du message multipart/form-data est valide
 			if environ["CONTENT"].ends_with("--" + boundary + "--"):
-				var form: PackedStringArray = environ["CONTENT"].split("--" + boundary, false)
+				var form: PoolStringArray = environ["CONTENT"].split("--" + boundary, false)
 				#On supprime le premier élément du tableau car il est vide.
 				form.resize(form.size() - 1)
 				
@@ -122,7 +123,7 @@ var ssl_certificate: X509Certificate
 ##When using SSL (see private_key and ssl_certificate), you can set this to a valid X509Certificate to be provided as additional CA chain information during the SSL handshake.
 var ca_chain: X509Certificate
 
-var tcp_server := TCPServer.new()
+var tcp_server := TCP_Server.new()
 var mutex := Mutex.new()
 
 ##If [true] the verboss mode is actived.
@@ -141,8 +142,9 @@ var accept_compress := false
 var ssl := false
 
 # application helloworld par deffaut
-var application := func _application(environ):
-	return ["200 OK", {"content-type": "text/plain"}, "Hello world".to_utf8_buffer()]
+func _application(environ):
+	return ["200 OK", {"content-type": "text/plain"}, "Hello world".to_utf8()]
+var application = funcref(self, "_application")
 
 var application_error
 
@@ -164,7 +166,7 @@ func http_error(environ: Dictionary, status_code: int):
 			http_status = "503 Service Unavailable"
 	
 	if application_error:
-		var data_vus = application_error.call(environ, status_code)
+		var data_vus = application_error.call_func(environ, status_code)
 		
 		if typeof(data_vus) != TYPE_ARRAY:
 			push_error("(HTTPServer) The function assigned to the \"application_error\" variable of the server must return an \"Array\" type object.")
@@ -175,7 +177,7 @@ func http_error(environ: Dictionary, status_code: int):
 		else:
 			return [http_status] + data_vus
 	
-	return [http_status, {"content-type": "text/plain"}, http_status.to_utf8_buffer()]
+	return [http_status, {"content-type": "text/plain"}, http_status.to_utf8()]
 
 
 ## Starts listening on the given port.
@@ -248,7 +250,7 @@ func poll() -> void:
 	
 	# On tue les thread qui non plus de clients a gèrer
 	for thread in threads.keys():
-		if threads[thread].is_empty():
+		if threads[thread].empty():
 			threads.erase(thread)
 			semaphores.erase(thread)
 			
@@ -321,7 +323,7 @@ class StreamPeerHTTP:
 				http_status = "503 Service Unavailable"
 		
 		if application_error:
-			var data_vus = application_error.call(environ, status_code)
+			var data_vus = application_error.call_func(environ, status_code)
 			
 			if typeof(data_vus) != TYPE_ARRAY:
 				push_error("(HTTPServer) The function assigned to the \"application_error\" variable of the server must return an \"Array\" type object.")
@@ -332,7 +334,7 @@ class StreamPeerHTTP:
 			else:
 				return [http_status] + data_vus
 		
-		return [http_status, {"content-type": "text/plain"}, http_status.to_utf8_buffer()]
+		return [http_status, {"content-type": "text/plain"}, http_status.to_utf8()]
 		
 	func get_data_priority_header(header) -> Array:
 		var result = []
@@ -340,7 +342,7 @@ class StreamPeerHTTP:
 		for gf in header.replace(" ", "").split(","):
 			var ggffd = gf.split(";q=")
 			
-			if not ggffd.is_empty() and ggffd.size() < 3:
+			if not ggffd.empty() and ggffd.size() < 3:
 				if ggffd.size() == 1:
 					ggffd.insert(1, "1")
 				elif not ggffd[1].is_valid_float():
@@ -352,7 +354,7 @@ class StreamPeerHTTP:
 				
 			result.push_back(ggffd)
 		
-		result.sort_custom(Callable(self, "sort_ascending"))
+		result.sort_custom(CustomSorter, "sort_ascending")
 		
 		return result
 	
@@ -406,8 +408,10 @@ class StreamPeerHTTP:
 						
 						if result:
 							environ["REQUEST_METHOD"] = result.strings[1]
-							environ["PATH"] = result.strings[2].uri_decode()
-							environ["QUERY_STRING"] = result.strings[3].uri_decode()
+							
+							environ["PATH"] = result.strings[2].percent_decode()
+							
+							environ["QUERY_STRING"] = result.strings[3].percent_decode()
 							environ["SERVER_PROTOCOL"] = result.strings[4] + result.strings[5]
 							environ["CONTENT"] = result.strings[7]
 							
@@ -430,9 +434,11 @@ class StreamPeerHTTP:
 						else:
 							print("erreur, 400")
 						
+						
 						if response[0] == OK:
 							if environ:
-								data_vus = application.call(environ)
+								
+								data_vus = application.call_func(environ)
 								
 								# On pence a vérif les valeur retourner parle la fonction affecter la la variable aplication du server.
 								if typeof(data_vus) != TYPE_ARRAY:
@@ -457,7 +463,7 @@ class StreamPeerHTTP:
 										
 										var to = resultTTT.strings[2]
 										
-										if to.is_empty():
+										if to.empty():
 											to = data_vus[2].size() - 1
 										
 										headers_dictionary["content-range"] = "bytes %s-%d/%d" % [resultTTT.strings[1], to, data_vus[2].size()]
@@ -516,7 +522,7 @@ class StreamPeerHTTP:
 						for field_name in headers_dictionary.keys():
 							header = header + field_name + ": " + headers_dictionary[field_name] + "\r\n"
 						
-						header = (header + "\r\n").to_utf8_buffer()
+						header = (header + "\r\n").to_utf8()
 						
 						if environ["REQUEST_METHOD"] != "HEAD":
 							header.append_array(data_vus[2])
